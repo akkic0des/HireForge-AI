@@ -1,0 +1,55 @@
+services:
+  database:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-hireforge}
+      MYSQL_USER: ${DB_USERNAME:-hireforge}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the root .env file}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in the root .env file}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - hireforge_mysql:/var/lib/mysql
+      - ./backend/db/migration/V1__initial_schema.sql:/docker-entrypoint-initdb.d/001-hireforge-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8080
+      DB_URL: jdbc:mysql://database:3306/${MYSQL_DATABASE:-hireforge}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: ${DB_USERNAME:-hireforge}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the root .env file}
+      JPA_DDL_AUTO: validate
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root .env file}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8081}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: /api
+    ports:
+      - "${WEB_PORT:-8081}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  hireforge_mysql:
