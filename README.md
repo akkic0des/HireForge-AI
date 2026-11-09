@@ -2,6 +2,8 @@
 
 HireForge is a private job-search workspace for tracking applications and preparing for interviews. It combines a React dashboard with a JWT-protected Spring Boot API and Groq-powered career tools.
 
+**Live demo:** [hireforge-ai.pages.dev](https://hireforge-ai.pages.dev)
+
 ## Features
 
 - Email/password registration and sign-in with BCrypt password hashing and signed JWTs.
@@ -14,13 +16,27 @@ HireForge is a private job-search workspace for tracking applications and prepar
 
 Career-tool requests are sent to Groq for processing. HireForge does not store resume text, job descriptions, or interview answers. The Groq key remains on the backend.
 
-## Screenshots
+## Application Screenshots
 
-Capture and add screenshots here after configuring a demo account and a running backend:
+**Dashboard** — Track application totals and review pipeline progress at a glance.
 
-- `docs/screenshots/dashboard.png` — dashboard and application pipeline.
-- `docs/screenshots/resume-review.png` — structured resume feedback.
-- `docs/screenshots/interview-coach.png` — question practice and answer feedback.
+![HireForge AI dashboard and application pipeline](01-dashboard.png)
+
+**Application tracker** — Search, review, and update roles across application stages.
+
+![HireForge AI application tracker](02-application-tracker.png)
+
+**Resume review** — Get role-aware feedback on resume strengths and areas to improve.
+
+![HireForge AI resume review](03-resume-review.png)
+
+**Job match** — Compare resume evidence with a job description to identify role alignment.
+
+![HireForge AI job match](04-job-match.png)
+
+**Interview practice** — Generate role-specific questions and practice interview preparation.
+
+![HireForge AI interview practice](05-interview-practice.png)
 
 ## Architecture
 
