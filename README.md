@@ -99,6 +99,7 @@ Copy the relevant placeholder file for reference: root `.env.example` for Docker
 | --- | --- | --- |
 | `DB_URL` | Backend | JDBC URL for MySQL |
 | `DB_USERNAME`, `DB_PASSWORD` | Backend | MySQL credentials |
+| `PORT` | Backend on Render | Render-provided HTTP listening port; defaults to `10000` |
 | `JPA_DDL_AUTO` | Backend | Local default is `update`; production profile uses `validate` |
 | `JWT_SECRET` | Backend | Base64-encoded HMAC secret; generate at least 32 random bytes |
 | `JWT_EXPIRATION_MS` | Backend | Optional JWT lifetime; defaults to 24 hours |
@@ -131,9 +132,9 @@ Career inputs are bounded by the API, PDF uploads are limited to 5 MB, and Groq 
 
 ## Database schema and data preservation
 
-`backend/db/migration/V1__initial_schema.sql` defines the initial schema for a fresh database. Docker Compose applies it only when the MySQL data volume is initialized for the first time. The existing local database is not used by Compose unless you explicitly change its JDBC configuration.
+`backend/src/main/resources/db/migration/V1__initial_schema.sql` defines the initial schema. In the `prod` profile, Spring SQL initialization executes this script on startup before Hibernate validation. Its `CREATE TABLE IF NOT EXISTS` statements create missing tables and leave existing tables and rows untouched. Hibernate then runs with `validate`; if an existing table does not match the entities, startup fails without trying to alter it. Docker Compose also mounts this same file for MySQL's first initialization; the application initializer is idempotent against those already-created tables.
 
-Production runs with `SPRING_PROFILES_ACTIVE=prod` and Hibernate `validate`, which checks the schema without automatically altering it. For a new hosted database, apply the initial SQL once before starting the API. For an existing database, first take and verify a backup; do not apply the initial schema as a substitute for an upgrade plan. Write and review a versioned, additive SQL migration for any required schema change, apply it to a staging copy, then deploy with `validate`. Never assign unowned application rows to a user automatically.
+This is an initial-schema initializer, not a versioned migration framework. For future schema changes, write and review a separate additive SQL migration, test it against a staging copy, and preserve `validate` in production. Never assign unowned application rows to a user automatically.
 
 ## Docker Compose demo
 
@@ -149,7 +150,31 @@ The Compose MySQL service initializes the schema only for a new empty volume. It
 
 ## Deployment status
 
-The included Docker Compose setup is a local demo. No hosted deployment has been configured or verified, and this README does not recommend a specific cloud provider or claim current hosting prices or limits. Before deploying, choose a provider and verify its current build, networking, storage, and pricing requirements. Keep secrets in the provider's secret manager and set `SPRING_PROFILES_ACTIVE=prod`, `JPA_DDL_AUTO=validate`, and an exact `CORS_ALLOWED_ORIGINS` value for the deployed frontend.
+### Render Web Service
+
+Create a Docker Web Service from this repository with branch `main`, repository root as the build context, and `backend/Dockerfile` as the Dockerfile path. Leave the Docker start command blank to use the Dockerfile entrypoint. Render supplies `PORT`; the API binds to `0.0.0.0` and uses that port. Set `SPRING_PROFILES_ACTIVE=prod` and the environment variables below in Render's environment settings. Set `CORS_ALLOWED_ORIGINS` to the exact deployed frontend origin, including `https://` and without a trailing slash.
+
+| Render variable | Purpose |
+| --- | --- |
+| `SPRING_PROFILES_ACTIVE` | Set to `prod` to enable production database validation, TLS connection settings, and production error handling. |
+| `DB_URL` | TiDB JDBC connection URL shown below; contains no credentials. |
+| `DB_USERNAME`, `DB_PASSWORD` | TiDB credentials from the TiDB Cloud connection panel. |
+| `JWT_SECRET` | Base64 HMAC signing key generated from at least 32 random bytes. |
+| `GROQ_API_KEY` | Backend-only Groq key; optional if AI career tools are not needed. |
+| `CORS_ALLOWED_ORIGINS` | Exact public frontend origin, for example `https://hireforge-ai.pages.dev`. |
+| `PORT` | Set automatically by Render; no manual value is needed. |
+
+The service region `Singapore` is closest to the supplied TiDB endpoint region. Enable TiDB's public endpoint and ensure its firewall permits the Render service's outbound IP ranges. Render shows these ranges in the service's **Connect → Outbound** panel; if you restrict TiDB's firewall, allow the applicable ranges rather than only a developer workstation address.
+
+For TiDB Cloud Starter, set `DB_URL` to this JDBC URL (no username or password in the URL):
+
+```text
+jdbc:mysql://gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/hireforge?sslMode=VERIFY_IDENTITY&tlsVersions=TLSv1.2,TLSv1.3&serverTimezone=UTC
+```
+
+Use the exact database username shown by TiDB Cloud in `DB_USERNAME` and its password in `DB_PASSWORD`. TiDB Starter's public endpoint requires TLS. `VERIFY_IDENTITY` requires encryption, validates the certificate chain using the Java trust store, and checks the certificate hostname. The Render Free instance has 512 MB RAM; the Docker entrypoint caps JVM heap and other major memory regions and limits request threads, but sustained PDF processing or concurrent AI requests may still need a larger instance.
+
+Keep all credentials in Render's secret environment settings. `JWT_SECRET` must be a base64-encoded value generated from at least 32 random bytes. `GROQ_API_KEY` is only needed for AI career tools; without it, those endpoints remain unavailable while account and application features work.
 
 ## Tests and builds
 
